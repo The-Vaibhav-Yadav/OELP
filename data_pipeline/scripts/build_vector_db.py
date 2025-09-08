@@ -16,7 +16,7 @@ DB_HOST = os.environ.get("DB_HOST", "localhost")
 DB_PORT = os.environ.get("DB_PORT", "5432")
 
 # --- Project Paths and Model Config ---
-DATA_DIR = os.path.join(os.path.dirname(__file__), '..', '..', '2_app_data', 'structured_questions')
+DATA_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'app_data', 'structured_questions')
 MODEL_NAME = 'all-MiniLM-L6-v2' # A good starting model
 TABLE_NAME = "questions"
 
