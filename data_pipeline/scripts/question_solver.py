@@ -397,7 +397,7 @@ def main():
     solve_questions_from_file(
         input_file_path="/Users/vaibhav.yadav/Documents/Course/OELP/app_data/structured_questions/CAT_DILR.json",
         output_file_path="/Users/vaibhav.yadav/Documents/Course/OELP/app_data/structured_questions/CAT_DILR_solved.json",
-        api_key="KEY"  # Replace with your API key
+        api_key=""  # Replace with your API key
     )
 
 
