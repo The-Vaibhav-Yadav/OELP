@@ -8,6 +8,7 @@ dependencies = [
     "aiohttp>=3.12.15",
     "fastapi>=0.116.1",
     "fitz>=0.0.1.dev2",
+    "google-generativeai>=0.8.5",
     "numpy>=2.3.2",
     "passlib>=1.7.4",
     "pgvector>=0.4.1",
