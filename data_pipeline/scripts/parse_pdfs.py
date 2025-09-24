@@ -5,10 +5,6 @@ import os
 import glob
 from collections import defaultdict
 
-# --- Configuration ---
-SOURCE_PDF_DIR = os.path.join(os.path.dirname(__file__), '..', 'source_pdfs')
-OUTPUT_JSON_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'app_data', 'structured_questions')
-
 # --- Helper Functions ---
 def parse_metadata_from_filename(filename):
     """
@@ -119,7 +115,6 @@ def convert_questions_to_json(pdf_filepath):
             option_text = opt[1].replace('\n', ' ').strip()
             question_data[f"option{idx+1}"] = option_text
 
-        question_data["answer"] = "N/A"
         json_output.append(question_data)
         
     return json_output
@@ -128,8 +123,8 @@ def convert_questions_to_json(pdf_filepath):
 # Assumes the script is in a 'scripts' folder, 'source_pdfs' is a sibling to 'scripts',
 # and 'app_data' is in the parent of the parent directory.
 # Adjust the pathing ('..') as needed for your project structure.
-SOURCE_PDF_DIR = os.path.join(os.path.dirname(__file__), '..', 'source_pdfs')
-OUTPUT_JSON_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'app_data', 'structured_questions')
+SOURCE_PDF_DIR = os.path.join(os.path.dirname(__file__), '..', 'source_pdfs', 'CAT')
+OUTPUT_JSON_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'app_data', 'structured_questions', 'CAT')
 
 def process_pdf(pdf_path):
     """Processes a single PDF, parses questions, and saves to JSON."""

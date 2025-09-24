@@ -1,132 +1,90 @@
-import psycopg2
-import psycopg2.extras
-from pgvector.psycopg2 import register_vector
+import chromadb
 from sentence_transformers import SentenceTransformer
 import json
 import os
 import glob
-import numpy as np
 
 # --- Configuration ---
-# Database connection details (consider using environment variables for production)
-DB_NAME = os.environ.get("DB_NAME", "mock_test_db")
-DB_USER = os.environ.get("DB_USER", "user")
-DB_PASSWORD = os.environ.get("DB_PASSWORD", "password")
-DB_HOST = os.environ.get("DB_HOST", "localhost")
-DB_PORT = os.environ.get("DB_PORT", "5432")
-
-# --- Project Paths and Model Config ---
-DATA_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'app_data', 'structured_questions')
+DATA_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'app_data', 'structured_questions', 'CAT')
+VECTOR_DB_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'app_data', 'vector_db', 'CAT')
 MODEL_NAME = 'all-MiniLM-L6-v2' # A good starting model
-TABLE_NAME = "questions"
+
+def _construct_document_from_question(question_data):
+    """
+    Constructs a single string from a question object for embedding,
+    handling the 'option1', 'option2', etc., format.
+    """
+    # Start with the core question text and section
+    text_parts = [
+        f"Section: {question_data.get('section', '')}",
+        f"Question: {question_data.get('question_text', '')}"
+    ]
+
+    # Append options if they exist
+    for i in range(1, 5):
+        option_key = f"option{i}"
+        if option_key in question_data:
+            text_parts.append(f"Option {i}: {question_data[option_key]}")
+
+    return " ".join(text_parts)
 
 def build_vector_database():
     """
-    Reads structured JSON data, creates text embeddings, and stores them in a PostgreSQL database with pgvector.
+    Reads structured JSON data, creates text embeddings, and stores them in
+    separate ChromaDB collections for each section.
     """
     print(f"Loading sentence transformer model: {MODEL_NAME}...")
     model = SentenceTransformer(MODEL_NAME)
-    embedding_dim = model.get_sentence_embedding_dimension()
     
-    conn = None
-    try:
-        print("Connecting to the PostgreSQL database...")
-        conn = psycopg2.connect(
-            dbname=DB_NAME,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            host=DB_HOST,
-            port=DB_PORT
+    print(f"Initializing persistent vector database at: {VECTOR_DB_PATH}")
+    # This creates a client that saves all DB data to the specified folder
+    client = chromadb.PersistentClient(path=VECTOR_DB_PATH)
+    
+    json_files = glob.glob(os.path.join(DATA_DIR, "*.json"))
+    
+    if not json_files:
+        print(f"No JSON files found in {DATA_DIR}. Run the PDF parser first.")
+        return
+
+    for json_file in json_files:
+        section_name = os.path.basename(json_file).replace('CAT_', '').replace('.json', '').lower()
+        collection_name = f"cat_{section_name}"
+
+        print(f"\n--- Processing section: {section_name.upper()} ---")
+
+        # Get or create a dedicated collection for the section
+        collection = client.get_or_create_collection(name=collection_name)
+        
+        with open(json_file, 'r', encoding='utf-8') as f:
+            questions = json.load(f)
+
+        if not questions:
+            print(f"No questions found in {os.path.basename(json_file)}. Skipping.")
+            continue
+
+        print(f"Preparing {len(questions)} documents for embedding...")
+        documents = [_construct_document_from_question(q) for q in questions]
+        metadatas = [{"year": q['year'], "slot": q['slot']} for q in questions]
+        ids = [q['id'] for q in questions]
+
+        print(f"Generating embeddings for {len(documents)} documents... (This may take a moment)")
+        embeddings = model.encode(documents, show_progress_bar=True)
+        
+        print(f"Upserting {len(ids)} documents into the '{collection_name}' collection...")
+        # Use upsert to add new documents or update existing ones based on ID
+        collection.upsert(
+            ids=ids,
+            embeddings=embeddings.tolist(),
+            metadatas=metadatas,
+            documents=documents
         )
-        with conn.cursor() as cur:
-            # --- Setup Database ---
-            print("Setting up database extensions and tables...")
-            cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
-            register_vector(conn) # Register the vector type with psycopg2
-            
-            # Create the table to store questions and embeddings
-            cur.execute(f"""
-                CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
-                    id VARCHAR(255) PRIMARY KEY,
-                    document TEXT,
-                    metadata JSONB,
-                    embedding VECTOR({embedding_dim})
-                );
-            """)
-            
-            # Clear the table for a fresh build
-            print(f"Clearing existing data from table '{TABLE_NAME}'...")
-            cur.execute(f"TRUNCATE TABLE {TABLE_NAME};")
-
-        # --- Read and Process JSON data ---
-        json_files = glob.glob(os.path.join(DATA_DIR, "*.json"))
-        if not json_files:
-            print(f"No JSON files found in {DATA_DIR}. Run the PDF parser first.")
-            return
-
-        all_documents = []
-        all_metadatas = []
-        all_ids = []
-        print("Reading and processing JSON files...")
-        for json_file in json_files:
-            with open(json_file, 'r', encoding='utf-8') as f:
-                questions = json.load(f)
-                for q in questions:
-                    text_to_embed = f"Section: {q['section']}. Question: {q['question_text']}"
-                    if q.get('passage_context'):
-                        text_to_embed = f"Passage: {q['passage_context']}. " + text_to_embed
-
-                    all_documents.append(text_to_embed)
-                    all_metadatas.append({
-                        "year": q['year'],
-                        "section": q['section'],
-                        "source_id": q['id']
-                    })
-                    all_ids.append(q['id'])
         
-        if not all_documents:
-            print("No documents to process. Exiting.")
-            return
+        count = collection.count()
+        print(f"Collection '{collection_name}' now contains {count} items.")
 
-        # --- Generate Embeddings ---
-        print(f"Generating embeddings for {len(all_documents)} questions... (This may take a moment)")
-        embeddings = model.encode(all_documents, show_progress_bar=True)
+    print("\nVector database build complete.")
+    print(f"Database files are stored in: {os.path.abspath(VECTOR_DB_PATH)}")
 
-        # --- Insert Data into PostgreSQL ---
-        print("Inserting data into the database...")
-        with conn.cursor() as cur:
-            # Use execute_values for efficient batch insertion
-            data_to_insert = [
-                (all_ids[i], all_documents[i], json.dumps(all_metadatas[i]), np.array(embeddings[i]))
-                for i in range(len(all_ids))
-            ]
-            psycopg2.extras.execute_values(
-                cur,
-                f"INSERT INTO {TABLE_NAME} (id, document, metadata, embedding) VALUES %s",
-                data_to_insert
-            )
-        
-        # --- Create an Index for Fast Searching ---
-        print("Creating an IVFFlat index for efficient similarity search...")
-        with conn.cursor() as cur:
-            num_rows = len(all_ids)
-            # The number of lists is a tuning parameter, sqrt(num_rows) is a common suggestion
-            num_lists = int(np.sqrt(num_rows))
-            cur.execute(f"CREATE INDEX ON {TABLE_NAME} USING ivfflat (embedding vector_l2_ops) WITH (lists = {num_lists});")
-
-        conn.commit()
-        
-        with conn.cursor() as cur:
-            cur.execute(f"SELECT COUNT(*) FROM {TABLE_NAME};")
-            count = cur.fetchone()[0]
-            print(f"\nVector database build complete. Table '{TABLE_NAME}' now contains {count} items.")
-            
-    except psycopg2.Error as e:
-        print(f"Database error: {e}")
-    finally:
-        if conn:
-            conn.close()
-            print("Database connection closed.")
 
 if __name__ == "__main__":
     build_vector_database()
