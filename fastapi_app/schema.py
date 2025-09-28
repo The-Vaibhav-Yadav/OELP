@@ -1,5 +1,11 @@
 from pydantic import BaseModel, EmailStr
 from fastapi.security import OAuth2PasswordRequestForm as FastAPIForm
+import enum
+
+# Define an Enum for user roles to match the database model
+class UserRole(str, enum.Enum):
+    USER = "user"
+    ADMIN = "admin"
 
 # --- User Schemas ---
 
@@ -14,17 +20,16 @@ class UserCreate(UserBase):
 class User(UserBase):
     """
     Schema used for returning user data from the API.
-    It inherits from UserBase and includes the ID and active status, but crucially,
+    It includes the ID, active status, and role, but crucially,
     it does NOT include the password, ensuring hashed passwords are never exposed.
     """
     id: int
     is_active: bool
+    role: UserRole
 
     class Config:
-        # This setting allows Pydantic to read data directly from ORM models
-        # (like the User model from models.py), making it easy to convert
-        # database objects into API responses.
-        orm_mode = True
+        # This setting allows Pydantic to read data directly from ORM models.
+        from_attributes = True
 
 # --- Token Schemas ---
 
@@ -37,10 +42,17 @@ class TokenData(BaseModel):
     """Schema for the data contained within a JWT token."""
     email: str | None = None
     user_id: int | None = None
+    role: str | None = None
+
+# --- Exam Generation Schemas ---
+class ExamGenerationRequest(BaseModel):
+    """Schema for the request to generate a new exam, allowing for customization."""
+    exam_name: str = "CAT"
+    stream: str | None = None
+    year: int | None = None
+
 
 # --- OAuth2 Password Request Form ---
-# This makes the standard username/password form data available in the
-# interactive API docs (/docs) for easy testing of the login endpoint.
 class OAuth2PasswordRequestForm(FastAPIForm):
     pass
 

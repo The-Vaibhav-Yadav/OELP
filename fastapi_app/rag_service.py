@@ -1,27 +1,26 @@
-import os
+import chromadb
+from sentence_transformers import SentenceTransformer
 import json
+import os
 import random
 import asyncio
 import aiohttp
-import chromadb
-from dotenv import load_dotenv
 from datetime import datetime
-from sentence_transformers import SentenceTransformer
-
-env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
-load_dotenv(dotenv_path=env_path)
 
 # --- Configuration ---
-VECTOR_DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'app_data', 'vector_db', 'CAT')
-STRUCTURED_QUESTIONS_DIR = os.path.join(os.path.dirname(__file__), '..', 'app_data', 'structured_questions', 'CAT')
-GENERATED_EXAMS_DIR = os.path.join(os.path.dirname(__file__), '..', 'app_data', 'generated_questions', 'CAT')
+VECTOR_DB_PATH = os.path.join('/Users/vaibhav.yadav/Documents/Course/OELP/app_data', 'vector_db', 'CAT')
+STRUCTURED_QUESTIONS_DIR = os.path.join('/Users/vaibhav.yadav/Documents/Course/OELP/app_data', 'structured_questions', 'CAT')
+GENERATED_EXAMS_DIR = os.path.join('/Users/vaibhav.yadav/Documents/Course/OELP/app_data', 'generated_questions', 'CAT')
 MODEL_NAME = 'all-MiniLM-L6-v2'
 
 # Structure of the CAT exam to be generated
-EXAM_STRUCTURE = {
-    "varc": {"mcq": 21, "tita": 3, "total": 24},
-    "dilr": {"mcq": 12, "tita": 10, "total": 22},
-    "quant": {"mcq": 14, "tita": 8, "total": 22}
+SUPPORTED_EXAMS = {
+    "CAT": {
+        "varc": {"mcq": 21, "tita": 3},
+        "dilr": {"mcq": 12, "tita": 10},
+        "quant": {"mcq": 14, "tita": 8}
+    }
+    # Future exams like GATE can be added here
 }
 
 # Mapping for section names to filename abbreviations
@@ -44,7 +43,7 @@ class RAGService:
             if collections:
                 print(f"Found {len(collections)} collections: {[c.name for c in collections]}")
             else:
-                print("No collections found. Please run '2_build_vector_db.py' to create them.")
+                print("No collections found. Please run 'build_vector_db.py' to create them.")
         except Exception as e:
             print(f"Could not connect to or list collections in ChromaDB: {e}")
             print("Please ensure the vector database has been built correctly.")
@@ -74,9 +73,8 @@ class RAGService:
         Handles specific filenames like 'CAT_QA_all_years_combined.json'.
         """
         source_data = {}
-        for section in EXAM_STRUCTURE.keys():
+        for section in SUPPORTED_EXAMS["CAT"].keys():
             file_abbr = SECTION_FILENAME_MAP.get(section, section.upper())
-            
             file_name = f"CAT_{file_abbr}_all_years_combined.json"
             file_path = os.path.join(STRUCTURED_QUESTIONS_DIR, file_name)
             
@@ -86,17 +84,25 @@ class RAGService:
                         data = json.load(f)
                         source_data[section] = data if isinstance(data, list) else []
                 except json.JSONDecodeError:
-                    print(f"Warning: Could not decode JSON from {file_path}. The file might be empty or corrupt.")
+                    print(f"Warning: Could not decode JSON from {file_path}.")
                     source_data[section] = []
             else:
                 source_data[section] = []
                 print(f"Warning: Source JSON file not found at '{file_path}'")
         return source_data
 
-    def _find_seed_question(self, section, q_type):
-        """Finds a random question of a specific type to seed the similarity search."""
+    def _find_seed_question(self, section, q_type, exam_name, stream, year):
+        """Finds a random question that matches the specified filters to seed the search."""
         candidates = self.source_questions.get(section, [])
         
+        # Filter by exam, stream, year if provided
+        if exam_name:
+            candidates = [q for q in candidates if q.get('exam', '').lower() == exam_name.lower()]
+        if stream:
+            candidates = [q for q in candidates if q.get('stream', '').lower() == stream.lower()]
+        if year:
+            candidates = [q for q in candidates if q.get('year') == year]
+
         if q_type == 'mcq':
             filtered = [q for q in candidates if 'option1' in q]
         else: # TITA
@@ -104,18 +110,17 @@ class RAGService:
 
         return random.choice(filtered) if filtered else None
 
-    async def _generate_single_question(self, session, section, q_type):
+    async def _generate_single_question(self, session, section, q_type, exam_name, stream, year):
         """Generates one new question using the RAG pipeline with Groq API."""
-        seed_question = self._find_seed_question(section, q_type)
+        seed_question = self._find_seed_question(section, q_type, exam_name, stream, year)
         if not seed_question:
-            return {"error": f"No seed questions found for {section} {q_type}"}
+            return {"error": f"No seed questions found for {exam_name} {stream or ''} {year or ''} - {section} {q_type}"}
 
         collection_abbr = 'qa' if section == 'quant' else section
         collection_name = f"cat_{collection_abbr}_all_years_combined"
 
         try:
             collection = self.client.get_collection(name=collection_name)
-            
             retrieved_results = collection.query(
                 query_texts=[seed_question['question_text']],
                 n_results=3 
@@ -133,13 +138,12 @@ class RAGService:
                 "Authorization": f"Bearer {GROQ_API_KEY}",
                 "Content-Type": "application/json"
             }
-            # --- MODIFIED: Added max_tokens and response_format for reliability ---
             payload = {
                 "messages": [{"role": "user", "content": prompt}],
                 "model": "llama-3.1-8b-instant",
                 "temperature": 0.7,
-                "max_tokens": 4096, # Set a generous limit to prevent cutoff
-                "response_format": {"type": "json_object"} # Enforce JSON output
+                "max_tokens": 4096,
+                "response_format": {"type": "json_object"}
             }
             
             async with session.post(api_url, json=payload, headers=headers, timeout=120) as response:
@@ -148,7 +152,6 @@ class RAGService:
                     llm_text = result.get("choices", [{}])[0].get("message", {}).get("content", "{}")
                     
                     try:
-                        # Since we are in JSON mode, we can parse directly
                         generated_q = json.loads(llm_text)
                         generated_q['section'] = SECTION_FILENAME_MAP.get(section, section.upper())
                         generated_q['type'] = q_type.upper()
@@ -175,7 +178,6 @@ class RAGService:
         
         context_str = "\n---\n".join(context_questions)
 
-        # --- MODIFIED: Strengthened prompt for JSON mode ---
         prompt = f"""
         You are an expert question setter for the CAT (Common Admission Test) exam.
         Your task is to generate a new, original question for the '{SECTION_FILENAME_MAP.get(section, section.upper())}' section.
@@ -191,55 +193,62 @@ class RAGService:
         """
         return prompt
 
-    async def generate_full_exam(self):
+    async def generate_full_exam(self, exam_name: str, stream: str | None = None, year: int | None = None):
         """
-        Orchestrates the generation of a full CAT mock exam section by section
+        Orchestrates the generation of a full mock exam section by section
         to respect API rate limits.
         """
-        print("Generating full CAT mock exam section by section to respect rate limits...")
+        if exam_name.upper() == "CAT":
+            exam_key = f"{exam_name.upper()}"
+        else:
+            exam_key = f"{exam_name.upper()}_{stream.upper()}" if stream else exam_name.upper()
+        exam_structure = SUPPORTED_EXAMS.get(exam_key)
+
+        if not exam_structure:
+            return {"error": f"Exam structure for '{exam_key}' is not supported."}
+
+        print(f"Generating {exam_key} mock exam...")
         full_exam = {
-            "VARC": [],
-            "DILR": [],
-            "QA": [],
-            "errors": []
+            "exam_details": {"name": exam_name, "stream": stream, "year": year},
+            "VARC": [], "DILR": [], "QA": [], "errors": []
         }
 
-        # Use a single session for all network requests
         async with aiohttp.ClientSession() as session:
-            sections_to_process = list(EXAM_STRUCTURE.keys())
+            sections_to_process = list(exam_structure.keys())
 
             for i, section in enumerate(sections_to_process):
                 print(f"\n--- Generating section: {section.upper()} ---")
                 
                 tasks = []
-                structure = EXAM_STRUCTURE[section]
+                structure = exam_structure[section]
                 
-                # Create all generation tasks for the current section
-                for _ in range(structure['mcq']):
-                    tasks.append(self._generate_single_question(session, section, 'mcq'))
-                for _ in range(structure['tita']):
-                    tasks.append(self._generate_single_question(session, section, 'tita'))
+                for q_type, count in structure.items():
+                    for _ in range(count):
+                        tasks.append(self._generate_single_question(session, section, q_type, exam_name, stream, year))
                 
-                # Run all tasks for the current section concurrently
                 generated_questions = await asyncio.gather(*tasks)
 
-                # Process and store the results for this section
                 for q in generated_questions:
                     section_key = q.get('section')
                     if section_key and section_key in full_exam:
                         full_exam[section_key].append(q)
-                    else:
+                    elif "error" in q:
                         full_exam["errors"].append(q)
+                    else:
+                        full_exam["errors"].append({"error": "Generated question has unknown section", "details": q})
 
                 print(f"--- Section {section.upper()} generation complete. ---")
 
-                # Wait for 60 seconds before starting the next section, but not after the last one
                 if i < len(sections_to_process) - 1:
                     print(f"Waiting for 60 seconds to avoid rate limiting...")
                     await asyncio.sleep(60)
         
         print("\nFull exam generation complete.")
-        
+        self._save_exam(full_exam)
+        return full_exam
+
+    def _save_exam(self, exam_data):
+        """Saves the generated exam to a timestamped JSON file."""
         try:
             os.makedirs(GENERATED_EXAMS_DIR, exist_ok=True)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -247,18 +256,19 @@ class RAGService:
             save_path = os.path.join(GENERATED_EXAMS_DIR, file_name)
 
             with open(save_path, 'w', encoding='utf-8') as f:
-                json.dump(full_exam, f, indent=2)
+                json.dump(exam_data, f, indent=2)
             
             print(f"Successfully saved generated exam to: {save_path}")
         except Exception as e:
             print(f"Error saving the generated exam: {e}")
 
-        return full_exam
-
-async def main():
+async def main_test():
+    """For standalone testing of the RAG service."""
     rag_service = RAGService()
-    await rag_service.generate_full_exam()
+    # Test generating a standard CAT exam
+    await rag_service.generate_full_exam(exam_name="CAT")
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    # This allows you to test the service by running 'python rag_service.py'
+    asyncio.run(main_test())
 
