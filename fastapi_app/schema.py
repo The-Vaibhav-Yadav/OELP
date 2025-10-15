@@ -46,10 +46,23 @@ class TokenData(BaseModel):
 
 # --- Exam Generation Schemas ---
 class ExamGenerationRequest(BaseModel):
-    """Schema for the request to generate a new exam, allowing for customization."""
-    exam_name: str = "CAT"
-    stream: str | None = None
+    """
+    Schema for the request to generate a new exam, allowing for customization.
+    Supports both CAT and GATE exams.
+    For GATE exams, stream is required and must be one of the 30 valid streams.
+    """
+    exam_name: str = "CAT"  # CAT or GATE
+    stream: str | None = None  # Required for GATE exams (CS, EE, ME, etc.)
     year: int | None = None
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "exam_name": "GATE",
+                "stream": "CS",
+                "year": 2024
+            }
+        }
 
 
 # --- OAuth2 Password Request Form ---

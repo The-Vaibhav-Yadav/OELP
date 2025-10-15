@@ -1,0 +1,15 @@
+[
+  {
+    "id": "gate_tech_cs_2024_s1_003",
+    "exam": "GATE",
+    "year": 2024,
+    "slot": 1,
+    "section": "TECH",
+    "question_text": "In an engineering college of 10,000 students, 1,500 like neither their core branches  nor other branches. The number of students who like their core branches is 1/4th of  the number of students who like other branches. The number of students who like  both their core and other branches is 500.  The number of students who like their core branches is",
+    "stream": "CS",
+    "option1": "1,800",
+    "option2": "3,500",
+    "option3": "1,600",
+    "option4": "1,500"
+  }
+]

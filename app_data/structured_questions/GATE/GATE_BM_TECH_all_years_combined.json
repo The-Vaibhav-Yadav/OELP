@@ -1,0 +1,15 @@
+[
+  {
+    "id": "gate_tech_bm_2022_s1_028",
+    "exam": "GATE",
+    "year": 2022,
+    "slot": 1,
+    "section": "TECH",
+    "question_text": "Which of the following statements related to the safety of biomedical instruments  are TRUE?",
+    "stream": "BM",
+    "option1": "When a person is exposed to an electrical hazard, let-go current is defined as the  maximum current at which the subject can withdraw voluntarily",
+    "option2": "Microshock is a physiological response resulting from an electrical current  passing through heart",
+    "option3": "The patient in an intensive care unit is being exposed to the danger of microshock  because of using internal conductive electrodes in the vicinity of the heart",
+    "option4": "The 50 Hz safe current limit for a microshock is greater than 50 mA"
+  }
+]

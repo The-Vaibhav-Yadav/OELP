@@ -1,0 +1,28 @@
+[
+  {
+    "id": "gate_tech_nm_2025_s1_021",
+    "exam": "GATE",
+    "year": 2025,
+    "slot": 1,
+    "section": "TECH",
+    "question_text": "The dynamic response amplitude |𝐻(𝜔)| of a single degree of freedom system  subjected to support motion is given by the following expression.  |𝐻(𝜔)| = √ 1 + 4 𝜁2 ( 𝜔 𝜔𝑛) 2 [1 −( 𝜔 𝜔𝑛) 2 ] 2 + 4 𝜁2 ( 𝜔 𝜔𝑛) 2     |𝐻(𝜔)| increases with an increase in damping ratio (𝜁) if the excitation            frequency (𝜔) is _________ the natural frequency (𝜔𝑛) of the system.",
+    "stream": "NM",
+    "option1": "equal to",
+    "option2": "0.75 times",
+    "option3": "√3 2  times",
+    "option4": "greater than √2 times"
+  },
+  {
+    "id": "gate_tech_nm_2025_s1_035",
+    "exam": "GATE",
+    "year": 2025,
+    "slot": 1,
+    "section": "TECH",
+    "question_text": "The beam PQRS is subjected to a vertical point load of 10 kN at point S as shown  in the figure.   The magnitude of fixed end moment at P is _______ kN-m.",
+    "stream": "NM",
+    "option1": "50",
+    "option2": "10",
+    "option3": "30",
+    "option4": "40"
+  }
+]

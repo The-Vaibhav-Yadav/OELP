@@ -20,8 +20,8 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# --- Initialize the RAG Service ---
-rag_service = RAGService()
+# --- Initialize the RAG Services ---
+# We'll create instances dynamically based on request
 
 # --- Include Routers from other files ---
 # Temporarily commented out to disable the payment system
@@ -51,6 +51,55 @@ def login_for_access_token(form_data: schema.OAuth2PasswordRequestForm = Depends
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
+# --- Information Endpoints ---
+
+@app.get("/gate-streams", tags=["Information"])
+def get_gate_streams():
+    """
+    Returns a list of all 30 supported GATE streams.
+    Useful for frontend dropdown menus and validation.
+    """
+    from .rag_service import GATE_STREAMS
+    
+    # Map stream codes to full names for better UX
+    stream_info = {
+        "AE": "Aerospace Engineering",
+        "AG": "Agricultural Engineering", 
+        "AR": "Architecture and Planning",
+        "BM": "Biomedical Engineering",
+        "BT": "Biotechnology",
+        "CE": "Civil Engineering",
+        "CH": "Chemical Engineering",
+        "CS": "Computer Science and Information Technology",
+        "CY": "Chemistry",
+        "DA": "Data Science and Artificial Intelligence",
+        "EC": "Electronics and Communication Engineering",
+        "EE": "Electrical Engineering",
+        "EN": "Environmental Science and Engineering",
+        "ES": "Earth Sciences",
+        "EY": "Ecology and Evolution",
+        "GE": "Geology and Geophysics",
+        "GG": "Geophysics",
+        "IN": "Instrumentation Engineering",
+        "MA": "Mathematics",
+        "ME": "Mechanical Engineering",
+        "MN": "Mining Engineering",
+        "MT": "Metallurgical Engineering",
+        "NM": "Naval Architecture and Marine Engineering",
+        "PE": "Petroleum Engineering",
+        "PH": "Physics",
+        "PI": "Production and Industrial Engineering",
+        "ST": "Statistics",
+        "TF": "Textile Engineering and Fibre Science",
+        "XE": "Engineering Sciences",
+        "XL": "Life Sciences"
+    }
+    
+    return {
+        "total_streams": len(GATE_STREAMS),
+        "streams": [{"code": code, "name": stream_info.get(code, "Unknown")} for code in GATE_STREAMS]
+    }
+
 # --- Core Application Endpoint ---
 
 # --- MODIFIED: The endpoint now accepts a request body with parameters ---
@@ -63,9 +112,13 @@ async def generate_new_exam(
     Generate a full, new mock exam based on the provided parameters.
     
     This is a protected endpoint. The user must provide a valid JWT access token.
+    Supports both CAT and GATE exams with all 30 GATE streams.
     """
     try:
         print(f"Generating new {request.exam_name} exam for user: {current_user.email}")
+        
+        # Create appropriate RAG service instance based on exam type
+        rag_service = RAGService(request.exam_name)
         
         # Pass the request parameters to the RAG service
         generated_exam = await rag_service.generate_full_exam(

@@ -1,0 +1,80 @@
+[
+  {
+    "id": "gate_tech_ge_2022_s1_049",
+    "exam": "GATE",
+    "year": 2022,
+    "slot": 1,
+    "section": "TECH",
+    "question_text": "Choose the CORRECT statement(s).",
+    "stream": "GE",
+    "option1": "Latitude of a place varies from 0 degree to 90 degree North or South, and Longitude  varies from 0 degree to 180 degree East or West of Greenwich Meridian.",
+    "option2": "Latitude of a place varies from 0 degree to 180 degree East or West of Greenwich  Meridian, and Longitude varies from 0 degree to 90 degree North or South.",
+    "option3": "Longitude of a point is the angle between the Greenwich Meridian and the meridian  passing through that point.",
+    "option4": "Latitude and Longitude of a place are subject to change with time.               Page 33 of 43"
+  },
+  {
+    "id": "gate_tech_ge_2022_s1_050",
+    "exam": "GATE",
+    "year": 2022,
+    "slot": 1,
+    "section": "TECH",
+    "question_text": "A map projection is",
+    "stream": "GE",
+    "option1": "a systematic representation of latitude and longitude lines on a plane (paper) map.",
+    "option2": "a representation of 3D shape of Earth on 2D plane.",
+    "option3": "dependent on the location of area on the Earth.",
+    "option4": "required for taking theodolite observations of horizontal angles."
+  },
+  {
+    "id": "gate_tech_ge_2022_s1_051",
+    "exam": "GATE",
+    "year": 2022,
+    "slot": 1,
+    "section": "TECH",
+    "question_text": "Face Left and Face Right observations using a vernier theodolite will eliminate",
+    "stream": "GE",
+    "option1": "index error",
+    "option2": "graduation error",
+    "option3": "eccentricity error",
+    "option4": "atmospheric error"
+  },
+  {
+    "id": "gate_tech_ge_2022_s1_052",
+    "exam": "GATE",
+    "year": 2022,
+    "slot": 1,
+    "section": "TECH",
+    "question_text": "The correlation coefficient between two bands of remote sensing data that would  yield good classification is",
+    "stream": "GE",
+    "option1": "close to one",
+    "option2": "close to zero",
+    "option3": "close to ten",
+    "option4": "between one to ten"
+  },
+  {
+    "id": "gate_tech_ge_2022_s1_053",
+    "exam": "GATE",
+    "year": 2022,
+    "slot": 1,
+    "section": "TECH",
+    "question_text": "In a covariance matrix, the main diagonal shows the ______ of each band.",
+    "stream": "GE",
+    "option1": "standard deviation",
+    "option2": "variance",
+    "option3": "mean",
+    "option4": "median               Page 36 of 43"
+  },
+  {
+    "id": "gate_tech_ge_2022_s1_054",
+    "exam": "GATE",
+    "year": 2022,
+    "slot": 1,
+    "section": "TECH",
+    "question_text": "Choose the INCORRECT statement about image segmentation in digital image  processing.",
+    "stream": "GE",
+    "option1": "Segmentation divides an image into different regions.",
+    "option2": "Image segmentation does not help in image classification.",
+    "option3": "Segmentation helps to identify objects or boundaries.",
+    "option4": "Segmentation is a process of partitioning an image into multiple sets of similar  pixels."
+  }
+]

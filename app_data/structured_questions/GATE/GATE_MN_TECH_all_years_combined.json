@@ -1,0 +1,15 @@
+[
+  {
+    "id": "gate_tech_mn_2023_s1_019",
+    "exam": "GATE",
+    "year": 2023,
+    "slot": 1,
+    "section": "TECH",
+    "question_text": "A linear programming problem is given as:  Maximize  𝑍= 4𝑥1 + 2𝑥2  Subject to:  2𝑥1 −2𝑥2 ≤20  4𝑥1 ≤80  𝑥1 ≥0, 𝑥2 ≥0  The problem has",
+    "stream": "MN",
+    "option1": "Unbounded solution.",
+    "option2": "Infeasible solution.",
+    "option3": "Multiple optimal solutions.",
+    "option4": "Unique optimal solution."
+  }
+]

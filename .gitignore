@@ -10,8 +10,11 @@ wheels/
 .venv
 .env
 
-#
-.json
-.pdf
+# Data files (comment out to track specific files)
+#.json
+#.pdf
 
-.gitignore
+# Tools temporary files
+tools/test_downloads/
+tools/*.tmp
+tools/*.log

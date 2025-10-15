@@ -1,0 +1,28 @@
+[
+  {
+    "id": "gate_tech_ae_2024_s1_015",
+    "exam": "GATE",
+    "year": 2024,
+    "slot": 1,
+    "section": "TECH",
+    "question_text": "For a single degree of freedom spring-mass-damper system subjected to harmonic  forcing, the part of the motion (response) that decays due to damping is known as:",
+    "stream": "AE",
+    "option1": "transient response",
+    "option2": "steady-state response",
+    "option3": "harmonic response",
+    "option4": "non-transient response"
+  },
+  {
+    "id": "gate_tech_ae_2025_s1_027",
+    "exam": "GATE",
+    "year": 2025,
+    "slot": 1,
+    "section": "TECH",
+    "question_text": "A simply supported horizontal beam is subjected to a distributed transverse load  varying linearly from 𝑞0 at A to zero at B, as shown in the figure. Which one of  the following options is correct?",
+    "stream": "AE",
+    "option1": "The magnitude of the vertical reaction force at A is larger than that at B.",
+    "option2": "The magnitude of the vertical reaction force at B is larger than that at A.",
+    "option3": "The magnitudes of the vertical reaction forces at A and B are equal.",
+    "option4": "The reactions at points A and B are indeterminate."
+  }
+]

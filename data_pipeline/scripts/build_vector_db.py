@@ -5,9 +5,14 @@ import os
 import glob
 
 # --- Configuration ---
-DATA_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'app_data', 'structured_questions', 'CAT')
-VECTOR_DB_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'app_data', 'vector_db', 'CAT')
 MODEL_NAME = 'all-MiniLM-L6-v2' # A good starting model
+
+def get_paths(exam_type):
+    """Get data and vector DB paths for a specific exam type"""
+    base_path = os.path.join(os.path.dirname(__file__), '..', '..')
+    data_dir = os.path.join(base_path, 'app_data', 'structured_questions', exam_type.upper())
+    vector_db_path = os.path.join(base_path, 'app_data', 'vector_db', exam_type.upper())
+    return data_dir, vector_db_path
 
 def _construct_document_from_question(question_data):
     """
@@ -28,29 +33,48 @@ def _construct_document_from_question(question_data):
 
     return " ".join(text_parts)
 
-def build_vector_database():
+def build_vector_database_for_exam(exam_type):
     """
     Reads structured JSON data, creates text embeddings, and stores them in
-    separate ChromaDB collections for each section.
+    separate ChromaDB collections for each section of a specific exam type.
     """
+    print(f"\n=== Building Vector Database for {exam_type} ===")
+    data_dir, vector_db_path = get_paths(exam_type)
+    
     print(f"Loading sentence transformer model: {MODEL_NAME}...")
     model = SentenceTransformer(MODEL_NAME)
     
-    print(f"Initializing persistent vector database at: {VECTOR_DB_PATH}")
-    # This creates a client that saves all DB data to the specified folder
-    client = chromadb.PersistentClient(path=VECTOR_DB_PATH)
+    print(f"Initializing persistent vector database at: {vector_db_path}")
+    os.makedirs(vector_db_path, exist_ok=True)
+    client = chromadb.PersistentClient(path=vector_db_path)
     
-    json_files = glob.glob(os.path.join(DATA_DIR, "*.json"))
+    json_files = glob.glob(os.path.join(data_dir, "*.json"))
     
     if not json_files:
-        print(f"No JSON files found in {DATA_DIR}. Run the PDF parser first.")
+        print(f"No JSON files found in {data_dir}. Run the PDF parser first for {exam_type}.")
         return
 
     for json_file in json_files:
-        section_name = os.path.basename(json_file).replace('CAT_', '').replace('.json', '').lower()
-        collection_name = f"cat_{section_name}"
+        filename = os.path.basename(json_file)
+        
+        # Extract collection name from filename
+        if exam_type == "CAT":
+            # e.g., "CAT_VARC_all_years_combined.json" -> "cat_varc_all_years_combined"
+            section_name = filename.replace('CAT_', '').replace('.json', '').lower()
+            collection_name = f"cat_{section_name}"
+        else:  # GATE
+            # Handle both general files (GATE_GA_...) and stream-specific files (GATE_CS_TECH_...)
+            parts = filename.replace('GATE_', '').replace('.json', '').split('_')
+            if len(parts) >= 3 and parts[1] in ['GA', 'TECH']:
+                # Stream-specific file: GATE_CS_TECH_all_years_combined.json
+                stream, section = parts[0], parts[1]
+                collection_name = f"gate_{stream.lower()}_{section.lower()}_all_years_combined"
+            else:
+                # General file: GATE_GA_all_years_combined.json
+                section = parts[0]
+                collection_name = f"gate_{section.lower()}_all_years_combined"
 
-        print(f"\n--- Processing section: {section_name.upper()} ---")
+        print(f"\n--- Processing: {filename} -> {collection_name} ---")
 
         # Get or create a dedicated collection for the section
         collection = client.get_or_create_collection(name=collection_name)
@@ -59,12 +83,20 @@ def build_vector_database():
             questions = json.load(f)
 
         if not questions:
-            print(f"No questions found in {os.path.basename(json_file)}. Skipping.")
+            print(f"No questions found in {filename}. Skipping.")
             continue
 
         print(f"Preparing {len(questions)} documents for embedding...")
         documents = [_construct_document_from_question(q) for q in questions]
-        metadatas = [{"year": q['year'], "slot": q['slot']} for q in questions]
+        
+        # Create metadata including available fields
+        metadatas = []
+        for q in questions:
+            metadata = {"year": q.get('year', 0), "slot": q.get('slot', 0)}
+            if 'stream' in q:
+                metadata['stream'] = q['stream']
+            metadatas.append(metadata)
+        
         ids = [q['id'] for q in questions]
 
         print(f"Generating embeddings for {len(documents)} documents... (This may take a moment)")
@@ -82,10 +114,16 @@ def build_vector_database():
         count = collection.count()
         print(f"Collection '{collection_name}' now contains {count} items.")
 
-    print("\nVector database build complete.")
-    print(f"Database files are stored in: {os.path.abspath(VECTOR_DB_PATH)}")
+    print(f"\nVector database build complete for {exam_type}.")
+    print(f"Database files are stored in: {os.path.abspath(vector_db_path)}")
+
+def build_all_vector_databases():
+    """Build vector databases for both CAT and GATE exams"""
+    for exam_type in ["CAT", "GATE"]:
+        build_vector_database_for_exam(exam_type)
+    print("\n=== All vector databases built successfully ===")
 
 
 if __name__ == "__main__":
-    build_vector_database()
+    build_all_vector_databases()
 

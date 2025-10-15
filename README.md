@@ -1,5 +1,5 @@
 AI-Powered Mock Test Platform
-This project is a complete backend system for a CAT/GATE mock test platform. It features an AI-powered question generation engine using a RAG (Retrieval-Augmented Generation) pipeline, a secure multi-user authentication system with role-based access, and a flexible structure for future expansion.
+This project is a complete backend system for a CAT/GATE mock test platform. It features an AI-powered question generation engine using a RAG (Retrieval-Augmented Generation) pipeline, a secure multi-user authentication system with role-based access, and support for all 30 GATE streams plus CAT exam sections. The platform uses advanced AI to generate contextually relevant practice questions.
 
 Project Structure
 The project is organized into three main directories to ensure a clear separation of concerns:
@@ -78,15 +78,19 @@ How to Use the Application
 Phase 1: Run the Data Pipeline
 This phase processes your raw PDFs into a searchable AI knowledge base. You only need to run this when you have new question papers to add.
 
-Add PDFs: Place your question paper PDF files into the data_pipeline/source_pdfs/ folder.
+Add PDFs: Place your question paper PDF files into the appropriate folders:
+- CAT papers: `data_pipeline/source_pdfs/CAT/`  
+- GATE papers: `data_pipeline/source_pdfs/GATE/`
 
-Parse PDFs to JSON: From the project's root directory, run the parsing script:
+Parse PDFs to JSON: From the project's root directory, run the parsing script (now supports both CAT and GATE):
 
 ```python -m data_pipeline.scripts.parse_pdfs```
 
-Build Vector Database: Next, run the script to create the AI embeddings. From the root directory:
+Build Vector Database: Next, run the script to create the AI embeddings for both exam types:
 
 ```python -m data_pipeline.scripts.build_vector_db```
+
+**Note**: The scripts automatically process both CAT and GATE exams. For GATE, ensure PDF filenames follow the pattern: `GATE-YYYY-STREAM-Session-N.pdf` (e.g., `GATE-2024-CS-Session-1.pdf`)
 
 Phase 2: Initialize the Application Database
 This is a one-time step to create the necessary tables and demo user accounts in your PostgreSQL database.
@@ -120,3 +124,34 @@ Copy the access_token you receive after logging in.
 Click the "Authorize" button at the top right, paste your token in the format Bearer <your_token>, and authorize.
 
 You can now use the protected /generate-exam endpoint to get your first AI-generated mock test!
+
+## Supported Exam Types
+
+### CAT (Common Admission Test)
+- **Sections**: VARC (24 questions), DILR (22 questions), QA (22 questions)  
+- **Question Types**: MCQ and TITA (Type In The Answer)
+- **Sample Request**:
+```json
+{
+    "exam_name": "CAT",
+    "year": 2024
+}
+```
+
+### GATE (Graduate Aptitude Test in Engineering) 
+- **Streams**: All 30 streams supported (CS, EE, ME, CE, etc.)
+- **Structure**: 65 questions per stream (10 GA + 55 Technical)
+- **Question Types**: MCQ and NAT (Numerical Answer Type)
+- **Sample Request**:
+```json
+{
+    "exam_name": "GATE", 
+    "stream": "CS",
+    "year": 2024
+}
+```
+
+### Available GATE Streams
+Use the `/gate-streams` endpoint to get the complete list of 30 supported streams with their full names.
+
+**Complete List**: AE, AG, AR, BM, BT, CE, CH, CS, CY, DA, EC, EE, EN, ES, EY, GE, GG, IN, MA, ME, MN, MT, NM, PE, PH, PI, ST, TF, XE, XL

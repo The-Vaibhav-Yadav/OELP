@@ -8,33 +8,64 @@ import aiohttp
 from datetime import datetime
 
 # --- Configuration ---
-VECTOR_DB_PATH = os.path.join('/Users/vaibhav.yadav/Documents/Course/OELP/app_data', 'vector_db', 'CAT')
-STRUCTURED_QUESTIONS_DIR = os.path.join('/Users/vaibhav.yadav/Documents/Course/OELP/app_data', 'structured_questions', 'CAT')
-GENERATED_EXAMS_DIR = os.path.join('/Users/vaibhav.yadav/Documents/Course/OELP/app_data', 'generated_questions', 'CAT')
+BASE_APP_DATA_PATH = '/Users/vaibhav.yadav/Documents/Course/OELP/app_data'
 MODEL_NAME = 'all-MiniLM-L6-v2'
 
-# Structure of the CAT exam to be generated
+def get_exam_paths(exam_type):
+    """Get paths for vector DB, questions, and generated exams based on exam type"""
+    return {
+        'vector_db': os.path.join(BASE_APP_DATA_PATH, 'vector_db', exam_type.upper()),
+        'structured_questions': os.path.join(BASE_APP_DATA_PATH, 'structured_questions', exam_type.upper()),
+        'generated_exams': os.path.join(BASE_APP_DATA_PATH, 'generated_questions', exam_type.upper())
+    }
+
+# Structure of supported exams to be generated
 SUPPORTED_EXAMS = {
     "CAT": {
         "varc": {"mcq": 21, "tita": 3},
         "dilr": {"mcq": 12, "tita": 10},
         "quant": {"mcq": 14, "tita": 8}
+    },
+    "GATE": {
+        # Common structure for all GATE streams
+        # Each stream has 65 questions: 10 GA (General Aptitude) + 55 Technical
+        "general_aptitude": {"mcq": 10, "tita": 0},
+        "technical": {"mcq": 45, "tita": 10}
     }
-    # Future exams like GATE can be added here
 }
+
+# All 30 GATE streams as of 2024
+GATE_STREAMS = [
+    "AE", "AG", "AR", "BM", "BT", "CE", "CH", "CS", "CY", "DA",
+    "EC", "EE", "EN", "ES", "EY", "GE", "GG", "IN", "MA", "ME",
+    "MN", "MT", "NM", "PE", "PH", "PI", "ST", "TF", "XE", "XL"
+]
 
 # Mapping for section names to filename abbreviations
 SECTION_FILENAME_MAP = {
+    # CAT sections
     "varc": "VARC",
     "dilr": "DILR",
-    "quant": "QA"
+    "quant": "QA",
+    # GATE sections
+    "general_aptitude": "GA",
+    "technical": "TECH"
 }
 
 class RAGService:
-    def __init__(self):
-        print("Initializing RAG Service...")
-        print(f"Loading vector database from: {VECTOR_DB_PATH}")
-        self.client = chromadb.PersistentClient(path=VECTOR_DB_PATH)
+    def __init__(self, exam_type="CAT"):
+        self.exam_type = exam_type.upper()
+        self.paths = get_exam_paths(self.exam_type)
+        
+        print(f"Initializing RAG Service for {self.exam_type} exam...")
+        print(f"Loading vector database from: {self.paths['vector_db']}")
+        
+        # Ensure directories exist
+        os.makedirs(self.paths['vector_db'], exist_ok=True)
+        os.makedirs(self.paths['structured_questions'], exist_ok=True)
+        os.makedirs(self.paths['generated_exams'], exist_ok=True)
+        
+        self.client = chromadb.PersistentClient(path=self.paths['vector_db'])
 
         # Diagnostic check for existing collections
         print("\n--- Vector DB Collection Summary ---")
@@ -70,13 +101,15 @@ class RAGService:
     def _load_source_questions(self):
         """
         Loads all questions from the JSON files into memory for quick lookups.
-        Handles specific filenames like 'CAT_QA_all_years_combined.json'.
+        Handles both CAT and GATE exam formats.
         """
         source_data = {}
-        for section in SUPPORTED_EXAMS["CAT"].keys():
+        exam_sections = SUPPORTED_EXAMS.get(self.exam_type, {}).keys()
+        
+        for section in exam_sections:
             file_abbr = SECTION_FILENAME_MAP.get(section, section.upper())
-            file_name = f"CAT_{file_abbr}_all_years_combined.json"
-            file_path = os.path.join(STRUCTURED_QUESTIONS_DIR, file_name)
+            file_name = f"{self.exam_type}_{file_abbr}_all_years_combined.json"
+            file_path = os.path.join(self.paths['structured_questions'], file_name)
             
             if os.path.exists(file_path):
                 try:
@@ -95,14 +128,27 @@ class RAGService:
         """Finds a random question that matches the specified filters to seed the search."""
         candidates = self.source_questions.get(section, [])
         
-        # Filter by exam, stream, year if provided
+        # Filter by exam first
         if exam_name:
             candidates = [q for q in candidates if q.get('exam', '').lower() == exam_name.lower()]
-        if stream:
+        
+        # For GATE, handle GA vs Technical sections differently
+        if exam_name and exam_name.upper() == "GATE":
+            if section == "general_aptitude":
+                # GA questions are shared across all streams, don't filter by stream
+                pass
+            elif section == "technical" and stream:
+                # Technical questions are stream-specific
+                candidates = [q for q in candidates if q.get('stream', '').lower() == stream.lower()]
+        elif stream:
+            # For other exams, filter by stream if provided
             candidates = [q for q in candidates if q.get('stream', '').lower() == stream.lower()]
+            
+        # Filter by year if provided
         if year:
             candidates = [q for q in candidates if q.get('year') == year]
 
+        # Filter by question type
         if q_type == 'mcq':
             filtered = [q for q in candidates if 'option1' in q]
         else: # TITA
@@ -116,8 +162,16 @@ class RAGService:
         if not seed_question:
             return {"error": f"No seed questions found for {exam_name} {stream or ''} {year or ''} - {section} {q_type}"}
 
-        collection_abbr = 'qa' if section == 'quant' else section
-        collection_name = f"cat_{collection_abbr}_all_years_combined"
+        # Handle collection naming for both CAT and GATE
+        if self.exam_type == "CAT":
+            collection_abbr = 'qa' if section == 'quant' else section
+            collection_name = f"cat_{collection_abbr}_all_years_combined"
+        else:  # GATE
+            if section == "technical":
+                # For GATE technical questions, use stream-specific collection
+                collection_name = f"gate_{stream.lower()}_technical_all_years_combined"
+            else:  # general_aptitude
+                collection_name = f"gate_ga_all_years_combined"
 
         try:
             collection = self.client.get_collection(name=collection_name)
@@ -198,20 +252,31 @@ class RAGService:
         Orchestrates the generation of a full mock exam section by section
         to respect API rate limits.
         """
-        if exam_name.upper() == "CAT":
-            exam_key = f"{exam_name.upper()}"
-        else:
-            exam_key = f"{exam_name.upper()}_{stream.upper()}" if stream else exam_name.upper()
-        exam_structure = SUPPORTED_EXAMS.get(exam_key)
+        exam_name_upper = exam_name.upper()
+        
+        # Validate GATE stream if provided
+        if exam_name_upper == "GATE":
+            if not stream or stream.upper() not in GATE_STREAMS:
+                return {"error": f"Invalid or missing GATE stream. Must be one of: {', '.join(GATE_STREAMS)}"}
+        
+        exam_structure = SUPPORTED_EXAMS.get(exam_name_upper)
 
         if not exam_structure:
-            return {"error": f"Exam structure for '{exam_key}' is not supported."}
+            return {"error": f"Exam structure for '{exam_name_upper}' is not supported."}
 
-        print(f"Generating {exam_key} mock exam...")
-        full_exam = {
-            "exam_details": {"name": exam_name, "stream": stream, "year": year},
-            "VARC": [], "DILR": [], "QA": [], "errors": []
-        }
+        print(f"Generating {exam_name_upper} mock exam...")
+        
+        # Initialize exam structure based on exam type
+        if exam_name_upper == "CAT":
+            full_exam = {
+                "exam_details": {"name": exam_name, "stream": stream, "year": year},
+                "VARC": [], "DILR": [], "QA": [], "errors": []
+            }
+        else:  # GATE
+            full_exam = {
+                "exam_details": {"name": exam_name, "stream": stream, "year": year},
+                "GA": [], "TECH": [], "errors": []
+            }
 
         async with aiohttp.ClientSession() as session:
             sections_to_process = list(exam_structure.keys())
@@ -250,10 +315,11 @@ class RAGService:
     def _save_exam(self, exam_data):
         """Saves the generated exam to a timestamped JSON file."""
         try:
-            os.makedirs(GENERATED_EXAMS_DIR, exist_ok=True)
+            os.makedirs(self.paths['generated_exams'], exist_ok=True)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            file_name = f"exam_{timestamp}.json"
-            save_path = os.path.join(GENERATED_EXAMS_DIR, file_name)
+            stream_suffix = f"_{exam_data['exam_details']['stream']}" if exam_data['exam_details'].get('stream') else ""
+            file_name = f"{self.exam_type.lower()}_exam{stream_suffix}_{timestamp}.json"
+            save_path = os.path.join(self.paths['generated_exams'], file_name)
 
             with open(save_path, 'w', encoding='utf-8') as f:
                 json.dump(exam_data, f, indent=2)
@@ -264,11 +330,14 @@ class RAGService:
 
 async def main_test():
     """For standalone testing of the RAG service."""
-    rag_service = RAGService()
     # Test generating a standard CAT exam
-    await rag_service.generate_full_exam(exam_name="CAT")
+    cat_service = RAGService("CAT")
+    await cat_service.generate_full_exam(exam_name="CAT")
+    
+    # Test generating a GATE exam
+    gate_service = RAGService("GATE")
+    await gate_service.generate_full_exam(exam_name="GATE", stream="CS")
 
 if __name__ == '__main__':
-    # This allows you to test the service by running 'python rag_service.py'
     asyncio.run(main_test())
 

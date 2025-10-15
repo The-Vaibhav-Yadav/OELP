@@ -1,0 +1,15 @@
+[
+  {
+    "id": "gate_tech_pi_2023_s1_024",
+    "exam": "GATE",
+    "year": 2023,
+    "slot": 1,
+    "section": "TECH",
+    "question_text": "A thin cylinder has length L, diameter d, and thickness 𝑡. It is made of a material  with modulus of elasticity E and Poisson’s ratio 𝜇. When the cylinder is subjected  to an internal pressure P, the change in length is",
+    "stream": "PI",
+    "option1": "𝑃𝑑𝐿 2𝑡𝐸 (1 2 − 𝜇)",
+    "option2": "𝑃𝑑𝐿 2𝑡𝐸 (2 − 𝜇)",
+    "option3": "𝑃𝑑𝐿 2𝑡𝐸 (1 − 2𝜇)",
+    "option4": "𝑃𝑑𝐿 4𝑡𝐸 (1 2 − 𝜇)"
+  }
+]

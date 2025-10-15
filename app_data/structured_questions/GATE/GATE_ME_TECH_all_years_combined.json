@@ -1,0 +1,15 @@
+[
+  {
+    "id": "gate_tech_me_2022_s1_026",
+    "exam": "GATE",
+    "year": 2022,
+    "slot": 1,
+    "section": "TECH",
+    "question_text": "Assuming the material considered in each statement is homogeneous, isotropic, linear  elastic, and the deformations are in the elastic range, which one or more of the  following statement(s) is/are TRUE?",
+    "stream": "ME",
+    "option1": "A body subjected to hydrostatic pressure has no shear stress.",
+    "option2": "If a long solid steel rod is subjected to tensile load, then its volume increases.",
+    "option3": "Maximum shear stress theory is suitable for failure analysis of brittle materials.",
+    "option4": "If a portion of a beam has zero shear force, then the corresponding portion of the  elastic curve of the beam is always straight."
+  }
+]
