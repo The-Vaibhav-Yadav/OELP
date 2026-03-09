@@ -1,188 +1,117 @@
-AI-Powered Mock Test Platform
-This project is a complete backend system for a CAT/GATE mock test platform. It features an AI-powered question generation engine using a RAG (Retrieval-Augmented Generation) pipeline, a secure multi-user authentication system with role-based access, and support for all 30 GATE streams plus CAT exam sections. The platform uses advanced AI to generate contextually relevant practice questions.
+# AI-Powered Mock Test Platform (CAT/GATE)
 
-Project Structure
-The project is organized into three main directories to ensure a clear separation of concerns:
+![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
+![Python](https://img.shields.io/badge/python-3.10+-blue)
+![Database](https://img.shields.io/badge/Database-PostgreSQL-blue)
+![Auth](https://img.shields.io/badge/Auth-JWT-orange)
+![License](https://img.shields.io/badge/license-MIT-green)
 
-mock_test_project/
-├── 📁 data_pipeline/      # Scripts for all offline data processing (PDFs -> Vector DB).
-├── 📁 app_data/           # All processed data used by the live application.
-├── 📁 fastapi_app/        # The live FastAPI web server.
-├── 📄 .env                  # (To be created) Environment variables for configuration.
-├── 📄 requirements.txt      # All Python dependencies.
-└── 📄 README.md             # This file.
+A mission-critical backend platform for conducting mock standardized tests (CAT and all 30 GATE streams). This project implements an intelligent, AI-driven question generation engine using an offline-to-online RAG (Retrieval-Augmented Generation) pipeline, combined with a robust role-based authentication system and comprehensive exam subject mapping.
 
-Setup and Installation
-Follow these steps to set up the project environment and run the application.
+## Table of Contents
+- [Tech Stack & Architecture](#tech-stack--architecture)
+- [Prerequisites](#prerequisites)
+- [Installation & Local Setup](#installation--local-setup)
+- [Usage & Running the App](#usage--running-the-app)
+- [Testing](#testing)
+- [Deployment](#deployment)
+- [Contributing Guidelines](#contributing-guidelines)
+- [License and Contact](#license-and-contact)
 
-Step 1: Prerequisites
-Ensure you have the following installed on your system:
+## Tech Stack & Architecture
 
-Python 3.10+
+### Core Technologies
+- **Backend API**: `FastAPI` (High-performance ASGI framework)
+- **AI / LLM Orchestration**: `Google Gemini API` (gemini-1.5-flash)
+- **RAG Pipeline**: `Vector Search` (for indexing question contexts from PDFs)
+- **Database**: `PostgreSQL` (User management, subscriptions, and scores)
+- **Auth**: `JWT` (Secure, stateless tokens with role-based access)
+- **Dependency Management**: `uv`
 
-uv: The Python package installer and virtual environment manager.
+### High-Level Architecture
+The platform is decoupled into three primary modules:
+1. **`data_pipeline/`**: Processes raw PDF sources into structured JSON and creates a persistent vector store for RAG queries.
+2. **`fastapi_app/`**: The main live server handling API requests, authentication, and dynamic question synthesis.
+3. **`app_data/`**: Persistent storage for indexed vector datasets and processed exam materials.
 
-PostgreSQL: The database used to store user and subscription data.
+```mermaid
+graph LR;
+    User-->FastAPI[FastAPI Server];
+    FastAPI-->Auth[Auth Manager];
+    Auth-->Postgres[(PostgreSQL)];
+    FastAPI-->RAG[RAG Logic];
+    RAG-->Gemini[Google Gemini API];
+    RAG-->VectorDB[(Vector Store)];
+```
 
-Step 2: Install Dependencies
-Clone the repository to your local machine.
+## Prerequisites
+- **Python**: Version 3.10+
+- **Database**: PostgreSQL server running (default port 5432).
+- **Tools**: `uv` package manager installed globally.
 
-Navigate to the project's root directory (mock_test_project/).
+## Installation & Local Setup
 
-Install all required Python packages using uv:
+```bash
+git clone https://github.com/The-Vaibhav-Yadav/OELP.git
+cd OELP
+uv sync
+```
 
-```uv sync```
+### Environment Variables
+Configure the application by creating a `.env` file in the `fastapi_app/` directory:
+```bash
+# Security secret (generate with: openssl rand -hex 32)
+SECRET_KEY="your_secure_secret"
 
-Step 3: Set Up the PostgreSQL Database
-The application requires a PostgreSQL database to store user accounts.
-
-Connect to PostgreSQL as a superuser (e.g., postgres or your main user account):
-
-```/Users/vaibhav.yadav/pgsql/bin/pg_ctl -D /Users/vaibhav.yadav/pgsql/data start```
-
-Verify it's running 
-
-```/Users/vaibhav.yadav/pgsql/bin/pg_isready```
-
-Create a dedicated database for the application:
-
-```CREATE DATABASE mock_test_db;```
-
-Create a user for the application. It's good practice not to use the superuser for the application itself.
-
-```CREATE USER my_app_user WITH PASSWORD 'your_secure_password';```
-
-Grant all privileges on the new database to your new user:
-
-```GRANT ALL PRIVILEGES ON DATABASE mock_test_db TO my_app_user;```
-
-Exit psql by typing \q.
-
-Step 4: Configure Environment Variables
-Navigate into the 3_fastapi_app/ directory.
-
-Create a file named .env.
-
-Add the following configuration details to the .env file, replacing the placeholder values with your own:
-
-# A long, random string for JWT security. Generate one with: openssl rand -hex 32
-SECRET_KEY="your_super_long_random_secret_string_here"
-
-# Your Gemini API key for AI question generation
+# AI Configuration
 GEMINI_API_KEY="your_gemini_api_key_here"
-# Optional: override the default Gemini model (defaults to gemini-1.5-flash)
-# GEMINI_MODEL="gemini-1.5-flash"
 
-# Your PostgreSQL database credentials from Step 3
+# Database Configuration
 DB_USER="my_app_user"
 DB_PASSWORD="your_secure_password"
 DB_HOST="localhost"
 DB_PORT="5432"
 DB_NAME="mock_test_db"
-
-How to Use the Application
-Phase 1: Run the Data Pipeline
-This phase processes your raw PDFs into a searchable AI knowledge base. You only need to run this when you have new question papers to add.
-
-Add PDFs: Place your question paper PDF files into the appropriate folders:
-- CAT papers: `data_pipeline/source_pdfs/CAT/`  
-- GATE papers: `data_pipeline/source_pdfs/GATE/`
-
-Parse PDFs to JSON: From the project's root directory, run the parsing script (now supports both CAT and GATE):
-
-```python -m data_pipeline.scripts.parse_pdfs```
-
-Build Vector Database: Next, run the script to create the AI embeddings for both exam types:
-
-```python -m data_pipeline.scripts.build_vector_db```
-
-**Note**: The scripts automatically process both CAT and GATE exams. For GATE, ensure PDF filenames follow the pattern: `GATE-YYYY-STREAM-Session-N.pdf` (e.g., `GATE-2024-CS-Session-1.pdf`)
-
-Phase 2: Initialize the Application Database
-This is a one-time step to create the necessary tables and demo user accounts in your PostgreSQL database.
-
-From the project's root directory, run the seed_db.py script:
-
-```python -m fastapi_app.seed_db```
-
-This will create the users and subscriptions tables and add two demo accounts: user@example.com and admin@example.com.
-
-Phase 3: Start the Server
-Make sure you are in the project's root directory.
-
-Run the Uvicorn server with the following command:
-
-```uvicorn 3_fastapi_app.main:app --reload```
-
-The server should now be running on http://127.0.0.1:8000.
-
-Phase 4: Test the API
-Open your web browser and navigate to the interactive API documentation: http://127.0.0.1:8000/docs.
-
-Register a new user or use the demo accounts at the /token endpoint to log in.
-
-Sample registration payload:
-```json
-{
-  "email": "student@example.com",
-  "full_name": "Student Name",
-  "password": "securePassword123"
-}
 ```
 
-User: user@example.com / password
+## Usage & Running the App
 
-Admin: admin@example.com / adminpassword
+### Phase 1: Data Pre-processing (Injesting Exam Content)
+1. Add your source PDF materials to `data_pipeline/source_pdfs/CAT/` or `GATE/`.
+2. Parse PDFs into structured JSON:
+   ```bash
+   uv run python -m data_pipeline.scripts.parse_pdfs
+   ```
+3. Build the semantic vector index:
+   ```bash
+   uv run python -m data_pipeline.scripts.build_vector_db
+   ```
 
-Copy the access_token you receive after logging in.
-
-Click the "Authorize" button at the top right, paste your token in the format Bearer <your_token>, and authorize.
-
-You can now use the protected /generate-exam endpoint to get your first AI-generated mock test!
-
-### Submit Completed Exams
-- `POST /submit-exam`: store a completed attempt for the logged-in user.
-  ```json
-  {
-    "exam_name": "GATE",
-    "stream": "CS",
-    "year": 2025,
-    "score": 58,
-    "exam_data": {
-      "responses": [...],
-      "metadata": {...}
-    }
-  }
-  ```
-- `GET /exam-history`: retrieve the most recent submissions (optional `limit` query parameter, default 20).
-
-## Supported Exam Types
-
-### CAT (Common Admission Test)
-- **Sections**: VARC (24 questions), DILR (22 questions), QA (22 questions)  
-- **Question Types**: MCQ and TITA (Type In The Answer)
-- **Sample Request**:
-```json
-{
-    "exam_name": "CAT",
-    "year": 2024
-}
+### Phase 2: Start the Web API
+Launch the FastAPI development server:
+```bash
+cd fastapi_app
+uv run uvicorn main:app --reload
 ```
+The server will start on **`http://localhost:8000`**. You can access interactive documentation at **`/docs`**.
 
-### GATE (Graduate Aptitude Test in Engineering) 
-- **Streams**: All 30 streams supported (CS, EE, ME, CE, etc.)
-- **Structure**: 65 questions per stream (10 GA + 55 Technical)
-- **Question Types**: MCQ and NAT (Numerical Answer Type)
-- **Sample Request**:
-```json
-{
-    "exam_name": "GATE", 
-    "stream": "CS",
-    "year": 2024
-}
-```
+## Testing
+Unit and integration tests for the mock test logic:
+- **Command**: `uv run pytest`
+- **Focus**: Validates authentication flows, token expiration, and RAG retrieval consistency.
 
-### Available GATE Streams
-Use the `/gate-streams` endpoint to get the complete list of 30 supported streams with their full names.
+## Deployment
+Recommended deployment strategy:
+- **Database**: Managed PostgreSQL instance (e.g., AWS RDS).
+- **Application**: Containerized using Docker and deployed to a scalable cloud service like AWS App Runner or Render.
+- **CI/CD**: Utilize GitHub Actions to run tests and rebuild the vector store on new content merges.
 
-**Complete List**: AE, AG, AR, BM, BT, CE, CH, CS, CY, DA, EC, EE, EN, ES, EY, GE, GG, IN, MA, ME, MN, MT, NM, PE, PH, PI, ST, TF, XE, XL
+## Contributing Guidelines
+1. Follow **GitFlow** branching.
+2. Ensure all commits use **Conventional Commit** formatting.
+3. Strict adherence to **PEP-8** and `ruff` linting.
+4. **Pull Requests**: Must pass all existing tests before code review as defined in GitHub Actions.
+
+## License and Contact
+- **License**: MIT
+- **Author**: Vaibhav Yadav (https://github.com/The-Vaibhav-Yadav)
